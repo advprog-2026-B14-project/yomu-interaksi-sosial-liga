@@ -1,0 +1,27 @@
+name: Continuous Deployment (CD) Dummy
+
+on:
+  workflow_run:
+    workflows: ["SonarCloud Quality Analysis"]
+    types:
+      - completed
+    branches:
+      - main
+      - staging
+      - ci-cd
+
+jobs:
+  deploy-dummy:
+    name: Deploy to Dummy Environment
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Simulate Deployment for Social Module
+        run: |
+          echo "Menyiapkan environment untuk Modul Interaksi Sosial & Liga..."
+          echo "Simulasi koneksi ke database social_mod di Supabase..."
+          echo "Status: Modul Berhasil di-deploy ke environment dummy (Branch: ${{ github.event.workflow_run.head_branch }})."

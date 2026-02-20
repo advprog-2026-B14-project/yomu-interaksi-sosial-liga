@@ -2,7 +2,7 @@ name: Continuous Integration (CI)
 
 on:
   push:
-    branches: [ "main", "staging" ]
+    branches: [ "main", "staging", "ci-cd" ]
   pull_request:
     branches: [ "main", "staging" ]
 
