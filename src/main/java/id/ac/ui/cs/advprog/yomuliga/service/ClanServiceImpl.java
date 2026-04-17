@@ -110,4 +110,14 @@ public class ClanServiceImpl implements ClanService {
 
        refreshClanStats(clanId);
     }
+
+    @Override
+    public List<Clan> getAllLeaderboard() {
+        return clanRepository.findAllByOrderByTotalSkorDesc();
+    }
+
+    @Override
+    public List<Clan> getLeaderboardByTier(String tier) {
+        return clanRepository.findAllByTierOrderByTotalSkorDesc(tier.toUpperCase());
+    }
 }

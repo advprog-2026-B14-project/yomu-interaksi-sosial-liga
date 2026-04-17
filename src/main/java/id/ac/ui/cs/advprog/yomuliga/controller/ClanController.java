@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -42,5 +43,15 @@ public class ClanController {
     public ResponseEntity<?> addScore(@RequestBody ScoreRequest request) {
         clanService.addScoreToMember(request.getClanId(), request.getUserId(), request.getPoints());
         return ResponseEntity.ok("Skor berhasil ditambahkan!");
+    }
+
+    @GetMapping("/leaderboard")
+    public ResponseEntity<List<Clan>> getLeaderboard(@RequestParam(required = false) String tier) {
+
+        if (tier != null && !tier.trim().isEmpty()) {
+            return ResponseEntity.ok(clanService.getLeaderboardByTier(tier));
+        }
+
+        return ResponseEntity.ok(clanService.getAllLeaderboard());
     }
 }

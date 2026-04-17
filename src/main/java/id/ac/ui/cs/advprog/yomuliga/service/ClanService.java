@@ -15,4 +15,7 @@ public interface ClanService {
 
     @Transactional
     void addScoreToMember(UUID clanId, UUID userId, double pointsGained);
+
+    List<Clan> getAllLeaderboard();
+    List<Clan> getLeaderboardByTier(String tier);
 }
