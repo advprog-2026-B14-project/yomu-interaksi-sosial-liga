@@ -27,4 +27,7 @@ public class ClanMember {
 
     @Column(name = "joined_at", insertable = false, updatable = false)
     private OffsetDateTime joinedAt;
+
+    @Column(name = "skor_individu")
+    private double skorIndividu;
 }

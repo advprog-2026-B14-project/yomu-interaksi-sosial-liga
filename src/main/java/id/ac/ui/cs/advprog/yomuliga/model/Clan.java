@@ -26,4 +26,19 @@ public class Clan {
 
     @Column(name = "total_skor")
     private Double totalSkor = 0.0;
+
+    public void addSkor(double points) {
+        this.totalSkor += points;
+        updateTier();
+    }
+
+    public void updateTier() {
+        if (this.totalSkor > 500) {
+            this.tier = "GOLD";
+        } else if (this.totalSkor > 100) {
+            this.tier = "SILVER";
+        } else {
+            this.tier = "BRONZE";
+        }
+    }
 }
