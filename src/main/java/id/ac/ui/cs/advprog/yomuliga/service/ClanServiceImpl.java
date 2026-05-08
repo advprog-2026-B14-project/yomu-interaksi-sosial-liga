@@ -1,5 +1,6 @@
 package id.ac.ui.cs.advprog.yomuliga.service;
 
+import id.ac.ui.cs.advprog.yomuliga.client.AchievementClient;
 import id.ac.ui.cs.advprog.yomuliga.model.Clan;
 import id.ac.ui.cs.advprog.yomuliga.model.ClanMember;
 import id.ac.ui.cs.advprog.yomuliga.repository.ClanRepository;
@@ -90,9 +91,10 @@ public class ClanServiceImpl implements ClanService {
         Clan clan = clanRepository.findById(clanId).orElseThrow();
         List<ClanMember> members = memberRepository.findAllByClanId(clanId);
 
-        double totalSkorBaru = hitungSkorBerdasarkanTier(clan, members);
+        double baseScore = hitungSkorBerdasarkanTier(clan, members);
+        double finalScore = applyBuffAndDebuff(clanId.toString(), baseScore);
 
-        clan.setTotalSkor(totalSkorBaru);
+        clan.setTotalSkor(finalScore);
 
         clan.updateTier();
 
@@ -119,5 +121,23 @@ public class ClanServiceImpl implements ClanService {
     @Override
     public List<Clan> getLeaderboardByTier(String tier) {
         return clanRepository.findAllByTierOrderByTotalSkorDesc(tier.toUpperCase());
+    }
+
+    private final AchievementClient achievementClient;
+
+    public ClanServiceImpl(AchievementClient achievementClient) {
+        this.achievementClient = achievementClient;
+    }
+
+    private double applyBuffAndDebuff(String clanId, double baseScore) {
+        double finalScore = baseScore;
+
+        double completionRate = achievementClient.getDailyMissionCompletionPercentage(clanId);
+
+        if (completionRate >= 0.5) {
+            finalScore = finalScore * 1.2;
+        }
+
+        return finalScore;
     }
 }
