@@ -11,7 +11,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,9 +69,7 @@ class ClanServiceImplTest {
         ClanMember existingMember = new ClanMember();
         when(memberRepository.findByUserId(dummyUserId)).thenReturn(Optional.of(existingMember));
 
-        Exception exception = assertThrows(RuntimeException.class, () -> {
-            clanService.joinClan(dummyClanId, dummyUserId);
-        });
+        Exception exception = assertThrows(RuntimeException.class, () -> clanService.joinClan(dummyClanId, dummyUserId));
 
         assertEquals("Kamu sudah bergabung dengan Clan lain!", exception.getMessage());
 
@@ -81,14 +78,14 @@ class ClanServiceImplTest {
 
     @Test
     void testGetLeaderboardByTier() {
-        List<Clan> mockList = Arrays.asList(dummyClan);
+        List<Clan> mockList = List.of(dummyClan);
 
         when(clanRepository.findAllByTierOrderByTotalSkorDesc("BRONZE")).thenReturn(mockList);
 
         List<Clan> result = clanService.getLeaderboardByTier("bronze");
 
         assertFalse(result.isEmpty());
-        assertEquals("Fasilkom Elite", result.get(0).getNamaClan());
+        assertEquals("Fasilkom Elite", result.getFirst().getNamaClan());
         verify(clanRepository, times(1)).findAllByTierOrderByTotalSkorDesc("BRONZE");
     }
 }
