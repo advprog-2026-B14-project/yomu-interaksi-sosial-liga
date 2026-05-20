@@ -5,7 +5,6 @@ import id.ac.ui.cs.advprog.yomuliga.model.Clan;
 import id.ac.ui.cs.advprog.yomuliga.model.ClanMember;
 import id.ac.ui.cs.advprog.yomuliga.repository.ClanRepository;
 import id.ac.ui.cs.advprog.yomuliga.repository.MemberRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +22,17 @@ public class ClanServiceImpl implements ClanService {
 
     private static final List<String> TIER_ORDER = List.of("BRONZE", "SILVER", "GOLD", "DIAMOND");
 
-    @Autowired
-    private ClanRepository clanRepository;
-    @Autowired
-    private MemberRepository memberRepository;
+    private final ClanRepository clanRepository;
+    private final MemberRepository memberRepository;
+    private final AchievementClient achievementClient;
+
+    public ClanServiceImpl(ClanRepository clanRepository,
+                           MemberRepository memberRepository,
+                           AchievementClient achievementClient) {
+        this.clanRepository = clanRepository;
+        this.memberRepository = memberRepository;
+        this.achievementClient = achievementClient;
+    }
 
     @Override
     public Clan createClan(String name, UUID leaderId) {
@@ -178,11 +184,6 @@ public class ClanServiceImpl implements ClanService {
         return clanRepository.findAllByTierOrderByTotalSkorDesc(tier.toUpperCase());
     }
 
-    private final AchievementClient achievementClient;
-
-    public ClanServiceImpl(AchievementClient achievementClient) {
-        this.achievementClient = achievementClient;
-    }
 
     private double applyBuffAndDebuff(String clanId, double baseScore) {
         double finalScore = baseScore;
