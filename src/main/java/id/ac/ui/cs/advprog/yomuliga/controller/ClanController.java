@@ -45,6 +45,12 @@ public class ClanController {
         return ResponseEntity.ok("Skor berhasil ditambahkan!");
     }
 
+    @PostMapping("/admin/end-season")
+    public ResponseEntity<?> endSeason() {
+        clanService.endOfSeason();
+        return ResponseEntity.ok(Map.of("message", "Season ended successfully"));
+    }
+
     @GetMapping("/leaderboard")
     public ResponseEntity<List<Clan>> getLeaderboard(@RequestParam(required = false) String tier) {
 

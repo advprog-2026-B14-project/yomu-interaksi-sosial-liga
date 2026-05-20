@@ -33,7 +33,9 @@ public class Clan {
     }
 
     public void updateTier() {
-        if (this.totalSkor > 500) {
+        if (this.totalSkor > 1000) {
+            this.tier = "DIAMOND";
+        } else if (this.totalSkor > 500) {
             this.tier = "GOLD";
         } else if (this.totalSkor > 100) {
             this.tier = "SILVER";

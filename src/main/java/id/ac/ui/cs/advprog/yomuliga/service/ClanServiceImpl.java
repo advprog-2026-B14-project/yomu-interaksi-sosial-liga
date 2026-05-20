@@ -9,12 +9,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ClanServiceImpl implements ClanService {
+
+    private static final List<String> TIER_ORDER = List.of("BRONZE", "SILVER", "GOLD", "DIAMOND");
 
     @Autowired
     private ClanRepository clanRepository;
@@ -37,7 +44,7 @@ public class ClanServiceImpl implements ClanService {
     @Override
     public void joinClan(UUID clanId, UUID userId) {
 
-        Clan clan = clanRepository.findById(clanId)
+        clanRepository.findById(clanId)
                 .orElseThrow(() -> new RuntimeException("Clan tidak ditemukan!"));
 
         if (memberRepository.findByUserId(userId).isPresent()) {
@@ -113,6 +120,54 @@ public class ClanServiceImpl implements ClanService {
        refreshClanStats(clanId);
     }
 
+    @Transactional
+    @Override
+    public void endOfSeason() {
+        List<Clan> clans = clanRepository.findAll();
+        if (clans.isEmpty()) {
+            return;
+        }
+
+        Map<String, List<Clan>> clansByTier = clans.stream()
+                .collect(Collectors.groupingBy(clan -> normalizeTier(clan.getTier())));
+
+        Map<UUID, String> updatedTiers = new HashMap<>();
+
+        for (String tier : TIER_ORDER) {
+            List<Clan> tierClans = new ArrayList<>(clansByTier.getOrDefault(tier, List.of()));
+            tierClans.sort(Comparator.comparingDouble(this::getClanTotalScore).reversed());
+
+            int moveCount = calculateSeasonMoveCount(tierClans.size());
+            if (moveCount == 0) {
+                continue;
+            }
+
+            String promotedTier = getNextTier(tier);
+            String relegatedTier = getPreviousTier(tier);
+
+            for (int i = 0; i < moveCount; i++) {
+                Clan promotedClan = tierClans.get(i);
+                if (promotedTier != null) {
+                    updatedTiers.put(promotedClan.getId(), promotedTier);
+                }
+            }
+
+            for (int i = tierClans.size() - moveCount; i < tierClans.size(); i++) {
+                Clan relegatedClan = tierClans.get(i);
+                if (relegatedTier != null) {
+                    updatedTiers.put(relegatedClan.getId(), relegatedTier);
+                }
+            }
+        }
+
+        for (Clan clan : clans) {
+            clan.setTier(updatedTiers.getOrDefault(clan.getId(), normalizeTier(clan.getTier())));
+            clan.setTotalSkor(0.0);
+        }
+
+        clanRepository.saveAll(clans);
+    }
+
     @Override
     public List<Clan> getAllLeaderboard() {
         return clanRepository.findAllByOrderByTotalSkorDesc();
@@ -139,5 +194,52 @@ public class ClanServiceImpl implements ClanService {
         }
 
         return finalScore;
+    }
+
+    private int calculateSeasonMoveCount(int clanCount) {
+        if (clanCount <= 1) {
+            return 0;
+        }
+
+        return Math.min((int) Math.ceil(clanCount * 0.2), clanCount / 2);
+    }
+
+    private String normalizeTier(String tier) {
+        if (tier == null || tier.trim().isEmpty()) {
+            return "BRONZE";
+        }
+
+        String normalized = tier.trim().toUpperCase();
+        return TIER_ORDER.contains(normalized) ? normalized : "BRONZE";
+    }
+
+    private String getNextTier(String tier) {
+        switch (normalizeTier(tier)) {
+            case "BRONZE":
+                return "SILVER";
+            case "SILVER":
+                return "GOLD";
+            case "GOLD":
+                return "DIAMOND";
+            default:
+                return null;
+        }
+    }
+
+    private String getPreviousTier(String tier) {
+        switch (normalizeTier(tier)) {
+            case "SILVER":
+                return "BRONZE";
+            case "GOLD":
+                return "SILVER";
+            case "DIAMOND":
+                return "GOLD";
+            default:
+                return null;
+        }
+    }
+
+    private double getClanTotalScore(Clan clan) {
+        return clan.getTotalSkor() == null ? 0.0 : clan.getTotalSkor();
     }
 }
