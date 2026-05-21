@@ -46,7 +46,7 @@ public class ClanServiceImpl implements ClanService {
     @Override
     public Clan createClan(String name, UUID leaderId) {
         if (clanRepository.findByNamaClan(name).isPresent()) {
-            throw new RuntimeException("Nama Clan sudah ada!");
+            throw new IllegalStateException("Nama Clan sudah ada!");
         }
 
         Clan clan = new Clan();
@@ -60,10 +60,10 @@ public class ClanServiceImpl implements ClanService {
     public void joinClan(UUID clanId, UUID userId) {
 
         clanRepository.findById(clanId)
-                .orElseThrow(() -> new RuntimeException("Clan tidak ditemukan!"));
+                .orElseThrow(() -> new IllegalStateException("Clan tidak ditemukan!"));
 
         if (memberRepository.findByUserId(userId).isPresent()) {
-            throw new RuntimeException("Kamu sudah bergabung dengan Clan lain!");
+            throw new IllegalStateException("Kamu sudah bergabung dengan Clan lain!");
         }
 
         ClanMember member = new ClanMember();
@@ -112,7 +112,7 @@ public class ClanServiceImpl implements ClanService {
     @Override
     public void addScoreToMember(UUID clanId, UUID userId, double pointsGained) {
         ClanMember member = memberRepository.findByClanIdAndUserId(clanId, userId)
-                .orElseThrow(() -> new RuntimeException("Member tidak ditemukan"));
+                .orElseThrow(() -> new IllegalStateException("Member tidak ditemukan"));
 
         member.setSkorIndividu(member.getSkorIndividu() + pointsGained);
         memberRepository.save(member);

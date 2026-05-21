@@ -8,7 +8,8 @@ import java.util.List;
 public class DiamondScoringStrategy implements TierScoringStrategy {
     @Override
     public double calculate(List<ClanMember> members) {
-        double tertimbang = 0, bobot = 0;
+        double tertimbang = 0.0;
+        double bobot = 0.0;
         for (ClanMember m : members) {
             double b = m.getRole().equals("KETUA") ? 1.5 : 1.0;
             tertimbang += m.getSkorIndividu() * b;
