@@ -28,6 +28,12 @@ class ClanServiceImplTest {
     @Mock
     private MemberRepository memberRepository;
 
+    @Mock
+    private List<id.ac.ui.cs.advprog.yomuliga.service.strategy.tier.TierScoringStrategy> tierStrategiesList;
+
+    @Mock
+    private List<id.ac.ui.cs.advprog.yomuliga.service.strategy.modifier.ScoreModifierStrategy> modifierStrategies;
+
     @InjectMocks
     private ClanServiceImpl clanService;
 
