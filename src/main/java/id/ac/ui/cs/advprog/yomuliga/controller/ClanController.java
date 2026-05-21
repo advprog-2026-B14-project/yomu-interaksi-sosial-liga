@@ -14,13 +14,18 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/liga")
+@CrossOrigin(origins = {"http://localhost:3000", "https://yomu-frontend-zeta.vercel.app"})
 public class ClanController {
 
-    @Autowired
-    private ClanService clanService;
+    private static final String MESSAGE_KEY = "message";
+
+    private final ClanService clanService;
+    public ClanController(ClanService clanService) {
+        this.clanService = clanService;
+    }
 
     @PostMapping("/clan/create")
-    public ResponseEntity<?> createClan(@RequestBody CreateClanRequest request) {
+    public ResponseEntity<Object> createClan(@RequestBody CreateClanRequest request) {
         try {
             Clan newClan = clanService.createClan(request.getNama(), request.getKetuaId());
             return ResponseEntity.ok(newClan);
@@ -30,7 +35,7 @@ public class ClanController {
     }
 
     @PostMapping("/clan/join")
-    public ResponseEntity<?> joinClan(@RequestBody JoinClanRequest request) {
+    public ResponseEntity<Map<String, String>> joinClan(@RequestBody JoinClanRequest request) {
         try {
             clanService.joinClan(request.getClanId(), request.getUserId());
             return ResponseEntity.ok(Map.of("message", "Berhasil bergabung ke clan!"));
@@ -40,24 +45,22 @@ public class ClanController {
     }
 
     @PostMapping("/add-score")
-    public ResponseEntity<?> addScore(@RequestBody ScoreRequest request) {
+    public ResponseEntity<String> addScore(@RequestBody ScoreRequest request) {
         clanService.addScoreToMember(request.getClanId(), request.getUserId(), request.getPoints());
         return ResponseEntity.ok("Skor berhasil ditambahkan!");
     }
 
     @PostMapping("/admin/end-season")
-    public ResponseEntity<?> endSeason() {
+    public ResponseEntity<Map<String, String>> endSeason() {
         clanService.endOfSeason();
         return ResponseEntity.ok(Map.of("message", "Season ended successfully"));
     }
 
     @GetMapping("/leaderboard")
     public ResponseEntity<List<Clan>> getLeaderboard(@RequestParam(required = false) String tier) {
-
         if (tier != null && !tier.trim().isEmpty()) {
             return ResponseEntity.ok(clanService.getLeaderboardByTier(tier));
         }
-
         return ResponseEntity.ok(clanService.getAllLeaderboard());
     }
 }

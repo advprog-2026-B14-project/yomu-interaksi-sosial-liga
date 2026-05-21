@@ -1,10 +1,12 @@
 package id.ac.ui.cs.advprog.yomuliga.service;
 
-import id.ac.ui.cs.advprog.yomuliga.client.AchievementClient;
 import id.ac.ui.cs.advprog.yomuliga.model.Clan;
 import id.ac.ui.cs.advprog.yomuliga.model.ClanMember;
+import id.ac.ui.cs.advprog.yomuliga.model.ClanTier;
 import id.ac.ui.cs.advprog.yomuliga.repository.ClanRepository;
 import id.ac.ui.cs.advprog.yomuliga.repository.MemberRepository;
+import id.ac.ui.cs.advprog.yomuliga.service.strategy.modifier.ScoreModifierStrategy;
+import id.ac.ui.cs.advprog.yomuliga.service.strategy.tier.TierScoringStrategy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,24 +22,31 @@ import java.util.stream.Collectors;
 @Service
 public class ClanServiceImpl implements ClanService {
 
-    private static final List<String> TIER_ORDER = List.of("BRONZE", "SILVER", "GOLD", "DIAMOND");
 
     private final ClanRepository clanRepository;
     private final MemberRepository memberRepository;
-    private final AchievementClient achievementClient;
+    private final Map<ClanTier, TierScoringStrategy> tierStrategies;
+    private final List<ScoreModifierStrategy> modifierStrategies;
 
     public ClanServiceImpl(ClanRepository clanRepository,
                            MemberRepository memberRepository,
-                           AchievementClient achievementClient) {
+                           List<TierScoringStrategy> tierStrategiesList,
+                           List<ScoreModifierStrategy> modifierStrategies) {
         this.clanRepository = clanRepository;
         this.memberRepository = memberRepository;
-        this.achievementClient = achievementClient;
+        this.modifierStrategies = modifierStrategies;
+
+        this.tierStrategies = tierStrategiesList.stream()
+                .collect(Collectors.toMap(
+                        strategy -> ClanTier.fromString(strategy.getTierName()),
+                        strategy -> strategy
+                ));
     }
 
     @Override
     public Clan createClan(String name, UUID leaderId) {
         if (clanRepository.findByNamaClan(name).isPresent()) {
-            throw new RuntimeException("Nama Clan sudah ada!");
+            throw new IllegalStateException("Nama Clan sudah ada!");
         }
 
         Clan clan = new Clan();
@@ -51,10 +60,10 @@ public class ClanServiceImpl implements ClanService {
     public void joinClan(UUID clanId, UUID userId) {
 
         clanRepository.findById(clanId)
-                .orElseThrow(() -> new RuntimeException("Clan tidak ditemukan!"));
+                .orElseThrow(() -> new IllegalStateException("Clan tidak ditemukan!"));
 
         if (memberRepository.findByUserId(userId).isPresent()) {
-            throw new RuntimeException("Kamu sudah bergabung dengan Clan lain!");
+            throw new IllegalStateException("Kamu sudah bergabung dengan Clan lain!");
         }
 
         ClanMember member = new ClanMember();
@@ -69,34 +78,19 @@ public class ClanServiceImpl implements ClanService {
         refreshClanStats(clanId);
     }
 
+    // Strategy Pattern
     @Override
     public double hitungSkorBerdasarkanTier(Clan clan, List<ClanMember> members) {
         if (members.isEmpty()) return 0.0;
 
-        switch (clan.getTier().toUpperCase()) {
-            case "BRONZE": // Penjumlahan total
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu).sum();
+        ClanTier currentTier = ClanTier.fromString(clan.getTier());
+        TierScoringStrategy strategy = tierStrategies.get(currentTier);
 
-            case "SILVER": // Rata rata skor
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu).average().orElse(0.0);
-
-            case "GOLD": // Skor top 5
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu)
-                        .boxed().sorted(Collections.reverseOrder()).limit(5)
-                        .mapToDouble(Double::doubleValue).sum();
-
-            case "DIAMOND": // Rata rata tertimbang
-                double tertimbang = 0, bobot = 0;
-                for (ClanMember m : members) {
-                    double b = m.getRole().equals("KETUA") ? 1.5 : 1.0;
-                    tertimbang += m.getSkorIndividu() * b;
-                    bobot += b;
-                }
-                return bobot > 0 ? (tertimbang / bobot) : 0.0;
-
-            default:
-                return 0.0;
+        if (strategy == null) {
+            return 0.0;
         }
+
+        return strategy.calculate(members);
     }
 
     @Override
@@ -118,7 +112,7 @@ public class ClanServiceImpl implements ClanService {
     @Override
     public void addScoreToMember(UUID clanId, UUID userId, double pointsGained) {
         ClanMember member = memberRepository.findByClanIdAndUserId(clanId, userId)
-                .orElseThrow(() -> new RuntimeException("Member tidak ditemukan"));
+                .orElseThrow(() -> new IllegalStateException("Member tidak ditemukan"));
 
         member.setSkorIndividu(member.getSkorIndividu() + pointsGained);
         memberRepository.save(member);
@@ -134,13 +128,14 @@ public class ClanServiceImpl implements ClanService {
             return;
         }
 
-        Map<String, List<Clan>> clansByTier = clans.stream()
-                .collect(Collectors.groupingBy(clan -> normalizeTier(clan.getTier())));
+        Map<ClanTier, List<Clan>> clansByTier = clans.stream()
+                .collect(Collectors.groupingBy(clan -> ClanTier.fromString(clan.getTier())));
 
         Map<UUID, String> updatedTiers = new HashMap<>();
 
-        for (String tier : TIER_ORDER) {
-            List<Clan> tierClans = new ArrayList<>(clansByTier.getOrDefault(tier, List.of()));
+        for (ClanTier currentTier : ClanTier.values()) {
+            List<Clan> tierClans = new ArrayList<>(clansByTier.getOrDefault(currentTier, List.of()));
+
             tierClans.sort(Comparator.comparingDouble(this::getClanTotalScore).reversed());
 
             int moveCount = calculateSeasonMoveCount(tierClans.size());
@@ -148,26 +143,29 @@ public class ClanServiceImpl implements ClanService {
                 continue;
             }
 
-            String promotedTier = getNextTier(tier);
-            String relegatedTier = getPreviousTier(tier);
+            ClanTier promotedTier = currentTier.next();
+            ClanTier relegatedTier = currentTier.previous();
 
             for (int i = 0; i < moveCount; i++) {
                 Clan promotedClan = tierClans.get(i);
                 if (promotedTier != null) {
-                    updatedTiers.put(promotedClan.getId(), promotedTier);
+                    updatedTiers.put(promotedClan.getId(), promotedTier.name());
                 }
             }
 
             for (int i = tierClans.size() - moveCount; i < tierClans.size(); i++) {
                 Clan relegatedClan = tierClans.get(i);
                 if (relegatedTier != null) {
-                    updatedTiers.put(relegatedClan.getId(), relegatedTier);
+                    updatedTiers.put(relegatedClan.getId(), relegatedTier.name());
                 }
             }
         }
 
+        // Update tier clan dan reset skor
         for (Clan clan : clans) {
-            clan.setTier(updatedTiers.getOrDefault(clan.getId(), normalizeTier(clan.getTier())));
+            String safeTierString = ClanTier.fromString(clan.getTier()).name();
+
+            clan.setTier(updatedTiers.getOrDefault(clan.getId(), safeTierString));
             clan.setTotalSkor(0.0);
         }
 
@@ -188,12 +186,11 @@ public class ClanServiceImpl implements ClanService {
     private double applyBuffAndDebuff(String clanId, double baseScore) {
         double finalScore = baseScore;
 
-        double completionRate = achievementClient.getDailyMissionCompletionPercentage(clanId);
-
-        if (completionRate >= 0.5) {
-            finalScore = finalScore * 1.2;
+        for (ScoreModifierStrategy modifier : modifierStrategies) {
+            if (modifier.isApplicable(clanId)) {
+                finalScore = modifier.applyModifier(finalScore);
+            }
         }
-
         return finalScore;
     }
 
@@ -203,41 +200,6 @@ public class ClanServiceImpl implements ClanService {
         }
 
         return Math.min((int) Math.ceil(clanCount * 0.2), clanCount / 2);
-    }
-
-    private String normalizeTier(String tier) {
-        if (tier == null || tier.trim().isEmpty()) {
-            return "BRONZE";
-        }
-
-        String normalized = tier.trim().toUpperCase();
-        return TIER_ORDER.contains(normalized) ? normalized : "BRONZE";
-    }
-
-    private String getNextTier(String tier) {
-        switch (normalizeTier(tier)) {
-            case "BRONZE":
-                return "SILVER";
-            case "SILVER":
-                return "GOLD";
-            case "GOLD":
-                return "DIAMOND";
-            default:
-                return null;
-        }
-    }
-
-    private String getPreviousTier(String tier) {
-        switch (normalizeTier(tier)) {
-            case "SILVER":
-                return "BRONZE";
-            case "GOLD":
-                return "SILVER";
-            case "DIAMOND":
-                return "GOLD";
-            default:
-                return null;
-        }
     }
 
     private double getClanTotalScore(Clan clan) {
