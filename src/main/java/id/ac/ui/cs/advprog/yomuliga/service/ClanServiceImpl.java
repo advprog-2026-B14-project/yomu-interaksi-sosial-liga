@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.yomuliga.model.Clan;
 import id.ac.ui.cs.advprog.yomuliga.model.ClanMember;
 import id.ac.ui.cs.advprog.yomuliga.repository.ClanRepository;
 import id.ac.ui.cs.advprog.yomuliga.repository.MemberRepository;
+import id.ac.ui.cs.advprog.yomuliga.service.strategy.modifier.ScoreModifierStrategy;
 import id.ac.ui.cs.advprog.yomuliga.service.strategy.tier.TierScoringStrategy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,16 +26,16 @@ public class ClanServiceImpl implements ClanService {
 
     private final ClanRepository clanRepository;
     private final MemberRepository memberRepository;
-    private final AchievementClient achievementClient;
     private final Map<String, TierScoringStrategy> tierStrategies;
+    private final List<ScoreModifierStrategy> modifierStrategies;
 
     public ClanServiceImpl(ClanRepository clanRepository,
                            MemberRepository memberRepository,
-                           AchievementClient achievementClient,
-                           List<TierScoringStrategy> tierStrategiesList) {
+                           List<TierScoringStrategy> tierStrategiesList,
+                           List<ScoreModifierStrategy> modifierStrategies) {
         this.clanRepository = clanRepository;
         this.memberRepository = memberRepository;
-        this.achievementClient = achievementClient;
+        this.modifierStrategies = modifierStrategies;
 
         this.tierStrategies = tierStrategiesList.stream()
                 .collect(Collectors.toMap(
@@ -181,12 +182,11 @@ public class ClanServiceImpl implements ClanService {
     private double applyBuffAndDebuff(String clanId, double baseScore) {
         double finalScore = baseScore;
 
-        double completionRate = achievementClient.getDailyMissionCompletionPercentage(clanId);
-
-        if (completionRate >= 0.5) {
-            finalScore = finalScore * 1.2;
+        for (ScoreModifierStrategy modifier : modifierStrategies) {
+            if (modifier.isApplicable(clanId)) {
+                finalScore = modifier.applyModifier(finalScore);
+            }
         }
-
         return finalScore;
     }
 
