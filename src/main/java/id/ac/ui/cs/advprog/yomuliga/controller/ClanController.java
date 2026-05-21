@@ -14,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/liga")
+@CrossOrigin(origins = "*")
 public class ClanController {
 
     @Autowired
