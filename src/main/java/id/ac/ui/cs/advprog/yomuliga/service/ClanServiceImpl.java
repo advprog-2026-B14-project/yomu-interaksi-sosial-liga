@@ -5,6 +5,7 @@ import id.ac.ui.cs.advprog.yomuliga.model.Clan;
 import id.ac.ui.cs.advprog.yomuliga.model.ClanMember;
 import id.ac.ui.cs.advprog.yomuliga.repository.ClanRepository;
 import id.ac.ui.cs.advprog.yomuliga.repository.MemberRepository;
+import id.ac.ui.cs.advprog.yomuliga.service.strategy.tier.TierScoringStrategy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +26,21 @@ public class ClanServiceImpl implements ClanService {
     private final ClanRepository clanRepository;
     private final MemberRepository memberRepository;
     private final AchievementClient achievementClient;
+    private final Map<String, TierScoringStrategy> tierStrategies;
 
     public ClanServiceImpl(ClanRepository clanRepository,
                            MemberRepository memberRepository,
-                           AchievementClient achievementClient) {
+                           AchievementClient achievementClient,
+                           List<TierScoringStrategy> tierStrategiesList) {
         this.clanRepository = clanRepository;
         this.memberRepository = memberRepository;
         this.achievementClient = achievementClient;
+
+        this.tierStrategies = tierStrategiesList.stream()
+                .collect(Collectors.toMap(
+                        strategy -> strategy.getTierName().toUpperCase(),
+                        strategy -> strategy
+                ));
     }
 
     @Override
@@ -69,34 +78,18 @@ public class ClanServiceImpl implements ClanService {
         refreshClanStats(clanId);
     }
 
+    // Strategy Pattern
     @Override
     public double hitungSkorBerdasarkanTier(Clan clan, List<ClanMember> members) {
         if (members.isEmpty()) return 0.0;
 
-        switch (clan.getTier().toUpperCase()) {
-            case "BRONZE": // Penjumlahan total
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu).sum();
+        String currentTier = clan.getTier().toUpperCase();
+        TierScoringStrategy strategy = tierStrategies.get(currentTier);
 
-            case "SILVER": // Rata rata skor
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu).average().orElse(0.0);
-
-            case "GOLD": // Skor top 5
-                return members.stream().mapToDouble(ClanMember::getSkorIndividu)
-                        .boxed().sorted(Collections.reverseOrder()).limit(5)
-                        .mapToDouble(Double::doubleValue).sum();
-
-            case "DIAMOND": // Rata rata tertimbang
-                double tertimbang = 0, bobot = 0;
-                for (ClanMember m : members) {
-                    double b = m.getRole().equals("KETUA") ? 1.5 : 1.0;
-                    tertimbang += m.getSkorIndividu() * b;
-                    bobot += b;
-                }
-                return bobot > 0 ? (tertimbang / bobot) : 0.0;
-
-            default:
-                return 0.0;
+        if (strategy == null) {
+            return 0.0;
         }
+        return strategy.calculate(members);
     }
 
     @Override
